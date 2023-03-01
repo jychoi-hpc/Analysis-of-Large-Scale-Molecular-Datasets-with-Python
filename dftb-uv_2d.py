@@ -12,6 +12,9 @@ The script iterates over a list of directories and in each of them performs the 
 (4) optional: plots the original spectrum and the smoothed spectrum in the file "abs_spectrum.png"
 '''
 
+import matplotlib as mpl
+mpl.use('Agg')
+
 import sys  # sys files processing
 import os  # os file processing
 import re  # regular expressions
@@ -49,10 +52,10 @@ export_delim = " "  # delimiter for data export
 #spectrum_discretization_step = 0.2
 
 # plot config section - configure here
-nm_plot = True  # wavelength plot in nm if True, if False energy plot in eV
+nm_plot = False  # wavelength plot in nm if True, if False energy plot in eV
 show_single_gauss = True  # show single gauss functions if True
 show_single_gauss_area = True  # show single gauss functions - area plot if True
-show_conv_spectrum = True  # show the convoluted spectra if True (if False peak labels will not be shown)
+show_conv_spectrum = False  # show the convoluted spectra if True (if False peak labels will not be shown)
 show_sticks = True  # show the stick spectra if True
 label_peaks = False  # show peak labels if True
 minor_ticks = True  # show minor ticks if True
@@ -140,6 +143,14 @@ max_energy = float('-inf')
 
 # nm_plot = args.plotwn
 
+def scantree(path):
+    for entry in os.scandir(path):
+        if entry.is_dir(follow_symlinks=False):
+            if entry.name.startswith("mol_"):
+                yield entry
+            else:
+                yield from scantree(entry.path)
+
 def find_energy_and_wavelength_extremes(path, min_energy, max_energy):
     comm.Barrier()
     if comm_rank == 0:
@@ -150,7 +161,8 @@ def find_energy_and_wavelength_extremes(path, min_energy, max_energy):
 
     dirs = None
     if comm_rank == 0:
-        dirs = [f.name for f in os.scandir(path) if f.is_dir()]
+        #dirs = [f.name for f in os.scandir(path) if f.is_dir()]
+        dirs = [os.path.relpath(f.path, path) for f in scantree(path) if f.is_dir()]
 
     dirs = comm.bcast(dirs, root=0)
 
@@ -387,7 +399,9 @@ def smooth_spectra(path, min_energy, max_energy, min_wavelength, max_wavelength)
     comm.Barrier()
     dirs = None
     if comm_rank == 0:
-        dirs = [f.name for f in os.scandir(path) if f.is_dir()]
+        #dirs = [f.name for f in os.scandir(path) if f.is_dir()]
+        dirs = [os.path.relpath(f.path, path) for f in scantree(path) if f.is_dir()]
+        print (">> dirs:", len(dirs))
 
     dirs = comm.bcast(dirs, root=0)
     rx = list(nsplit(range(len(dirs)), comm_size))[comm_rank]
@@ -410,7 +424,8 @@ def draw_2Dmols(path):
     comm.Barrier()
     dirs = None
     if comm_rank == 0:
-        dirs = [f.name for f in os.scandir(path) if f.is_dir()]
+        #dirs = [f.name for f in os.scandir(path) if f.is_dir()]
+        dirs = [os.path.relpath(f.path, path) for f in scantree(path) if f.is_dir()]
 
     dirs = comm.bcast(dirs, root=0)
     rx = list(nsplit(range(len(dirs)), comm_size))[comm_rank]
