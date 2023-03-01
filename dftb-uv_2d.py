@@ -154,16 +154,17 @@ def scantree(path):
 
 def subsetdirs(path):
     dirs = None
-    if os.path.isdir(path):
-        if comm_rank == 0:
-            dirs = [os.path.relpath(f.path, path) for f in scantree(path) if f.is_dir()]
-        dirs = comm.bcast(dirs, root=0)
-    else:
+    totalfile = os.path.join(path, "mollist.txt")
+    if os.path.exists(totalfile):
         dirs = list()
-        with open(path, "r") as f:
+        with open(totalfile, "r") as f:
             lines = f.readlines()
             for line in lines:
                 dirs.append(line.rstrip())
+    else:
+        if comm_rank == 0:
+            dirs = [os.path.relpath(f.path, path) for f in scantree(path) if f.is_dir()]
+        dirs = comm.bcast(dirs, root=0)
 
     rx = list(nsplit(range(len(dirs)), comm_size))[comm_rank]
 
@@ -264,7 +265,7 @@ def smooth_spectrum(path, min_energy, max_energy, min_wavelength, max_wavelength
         print(f"'{smile_string_file}'" + " not found", flush=True)
         sys.exit(1)
     except Exception as e:
-        print("Rank: ", comm_rank, " encountered Exception: ")
+        print("Rank: ", comm_rank, " encountered Exception: ", e, path)
         smiles_string = smile_string_file
         # comm.Abort(1)
 
@@ -458,13 +459,13 @@ def draw_2Dmol(path):
         print(f"'{smile_string_file}'" + " not found", flush=True)
         sys.exit(1)
     except Exception as e:
-        print("Rank: ", comm_rank, " encountered Exception: ", e)
+        print("Rank: ", comm_rank, " encountered Exception: ", e, path)
         smiles_string = smile_string_file
-        comm.Abort(1)
+        # comm.Abort(1)
 
 
 if __name__ == '__main__':
-    path = './dftb_gdb9_discrete_spectrum/mollist.txt'
+    path = './dftb_gdb9_electronic_excitation_spectrum'
     min_energy, max_energy, min_wavelength, max_wavelength = find_energy_and_wavelength_extremes(path, min_energy,
                                                                                                  max_energy)
     min_energy = comm.allreduce(min_energy, op=MPI.MIN)
