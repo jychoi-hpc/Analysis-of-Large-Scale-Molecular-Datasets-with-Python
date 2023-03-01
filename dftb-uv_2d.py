@@ -33,6 +33,7 @@ from rdkit.Chem.Draw import rdMolDraw2D
 from rdkit.Chem import AllChem
 
 from utils import nsplit, gauss
+from tqdm import tqdm
 
 plt.rcParams.update({'font.size': 22})
 
@@ -151,6 +152,23 @@ def scantree(path):
             else:
                 yield from scantree(entry.path)
 
+def subsetdirs(path):
+    dirs = None
+    if os.path.isdir(path):
+        if comm_rank == 0:
+            dirs = [os.path.relpath(f.path, path) for f in scantree(path) if f.is_dir()]
+        dirs = comm.bcast(dirs, root=0)
+    else:
+        dirs = list()
+        with open(path, "r") as f:
+            lines = f.readlines()
+            for line in lines:
+                dirs.append(line.rstrip())
+
+    rx = list(nsplit(range(len(dirs)), comm_size))[comm_rank]
+
+    return (sorted(dirs)[rx.start:rx.stop], rx)
+
 def find_energy_and_wavelength_extremes(path, min_energy, max_energy):
     comm.Barrier()
     if comm_rank == 0:
@@ -159,16 +177,10 @@ def find_energy_and_wavelength_extremes(path, min_energy, max_energy):
         print("=" * 50, flush=True)
     comm.Barrier()
 
-    dirs = None
-    if comm_rank == 0:
-        #dirs = [f.name for f in os.scandir(path) if f.is_dir()]
-        dirs = [os.path.relpath(f.path, path) for f in scantree(path) if f.is_dir()]
+    dirs, rx = subsetdirs(path)
 
-    dirs = comm.bcast(dirs, root=0)
-
-    rx = list(nsplit(range(len(dirs)), comm_size))[comm_rank]
-    for dir in sorted(dirs)[rx.start:rx.stop]:
-        print("f Rank: ", comm_rank, " - dir: ", dir, flush=True)
+    for dir in tqdm(dirs, disable=(comm_rank != 0)):
+        # print("f Rank: ", comm_rank, " - dir: ", dir, flush=True)
         # collect information about molecular structure and chemical composition
         spectrum_file = path + '/' + dir + '/' + '/' + 'EXC.DAT'
         if os.path.exists(spectrum_file):
@@ -397,19 +409,13 @@ def smooth_spectra(path, min_energy, max_energy, min_wavelength, max_wavelength)
         print("Smooth spectra", flush=True)
         print("=" * 50, flush=True)
     comm.Barrier()
-    dirs = None
-    if comm_rank == 0:
-        #dirs = [f.name for f in os.scandir(path) if f.is_dir()]
-        dirs = [os.path.relpath(f.path, path) for f in scantree(path) if f.is_dir()]
-        print (">> dirs:", len(dirs))
 
-    dirs = comm.bcast(dirs, root=0)
-    rx = list(nsplit(range(len(dirs)), comm_size))[comm_rank]
+    dirs, rx = subsetdirs(path)
     total = rx.stop - rx.start
     count = 0
-    for dir in sorted(dirs)[rx.start:rx.stop]:
+    for dir in tqdm(dirs, disable=(comm_rank != 0)):
         count = count + 1
-        print("s Rank: ", comm_rank, " - dir: ", dir, ", remaining: ", total - count, flush=True)
+        # print("s Rank: ", comm_rank, " - dir: ", dir, ", remaining: ", total - count, flush=True)
         # collect information about molecular structure and chemical composition
         if os.path.exists(path + '/' + dir + '/' + 'EXC.DAT'):
             smooth_spectrum(path + '/' + dir, min_energy, max_energy, min_wavelength, max_wavelength)
@@ -422,18 +428,13 @@ def draw_2Dmols(path):
         print("Draw molecules", flush=True)
         print("=" * 50, flush=True)
     comm.Barrier()
-    dirs = None
-    if comm_rank == 0:
-        #dirs = [f.name for f in os.scandir(path) if f.is_dir()]
-        dirs = [os.path.relpath(f.path, path) for f in scantree(path) if f.is_dir()]
 
-    dirs = comm.bcast(dirs, root=0)
-    rx = list(nsplit(range(len(dirs)), comm_size))[comm_rank]
+    dirs, rx = subsetdirs(path)
     total = rx.stop - rx.start
     count = 0
-    for dir in sorted(dirs)[rx.start:rx.stop]:
+    for dir in tqdm(dirs, disable=(comm_rank != 0)):
         count = count + 1
-        print("s Rank: ", comm_rank, " - dir: ", dir, ", remaining: ", total - count, flush=True)
+        # print("s Rank: ", comm_rank, " - dir: ", dir, ", remaining: ", total - count, flush=True)
         # collect information about molecular structure and chemical composition
         if os.path.exists(path + '/' + dir + '/' + 'smiles.pdb'):
             draw_2Dmol(path + '/' + dir)
@@ -457,13 +458,13 @@ def draw_2Dmol(path):
         print(f"'{smile_string_file}'" + " not found", flush=True)
         sys.exit(1)
     except Exception as e:
-        print("Rank: ", comm_rank, " encountered Exception: ")
+        print("Rank: ", comm_rank, " encountered Exception: ", e)
         smiles_string = smile_string_file
-        # comm.Abort(1)
+        comm.Abort(1)
 
 
 if __name__ == '__main__':
-    path = './dftb_gdb9_electronic_excitation_spectrum'
+    path = './dftb_gdb9_discrete_spectrum/mollist.txt'
     min_energy, max_energy, min_wavelength, max_wavelength = find_energy_and_wavelength_extremes(path, min_energy,
                                                                                                  max_energy)
     min_energy = comm.allreduce(min_energy, op=MPI.MIN)
