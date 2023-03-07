@@ -53,7 +53,7 @@ export_delim = " "  # delimiter for data export
 #spectrum_discretization_step = 0.2
 
 # plot config section - configure here
-nm_plot = False  # wavelength plot in nm if True, if False energy plot in eV
+nm_plot = True  # wavelength plot in nm if True, if False energy plot in eV
 show_single_gauss = True  # show single gauss functions if True
 show_single_gauss_area = True  # show single gauss functions - area plot if True
 show_conv_spectrum = False  # show the convoluted spectra if True (if False peak labels will not be shown)
@@ -373,10 +373,12 @@ def smooth_spectrum(path, min_energy, max_energy, min_wavelength, max_wavelength
 
         if nm_plot:
             #plt.xlim(60,500)
-            plt.savefig(f"{filename}/abs_spectrum_nm.png", dpi=figure_dpi)
+            #plt.savefig(f"{filename}/abs_spectrum_nm.png", dpi=figure_dpi)
+            pass
         else:
             #plt.xlim(2.50,15)
-            plt.savefig(f"{filename}/abs_spectrum_eV.png", dpi=figure_dpi)
+            # plt.savefig(f"{filename}/abs_spectrum_eV.png", dpi=figure_dpi)
+            pass
 
     # export data
     if export_spectrum:
