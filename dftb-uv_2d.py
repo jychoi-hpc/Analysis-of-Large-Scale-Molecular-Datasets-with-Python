@@ -265,7 +265,7 @@ def smooth_spectrum(path, min_energy, max_energy, min_wavelength, max_wavelength
         print(f"'{smile_string_file}'" + " not found", flush=True)
         sys.exit(1)
     except Exception as e:
-        print("Rank: ", comm_rank, " encountered Exception: ", e, path)
+        #print("Rank: ", comm_rank, " encountered Exception: ", e, path)
         smiles_string = smile_string_file
         # comm.Abort(1)
 
@@ -467,14 +467,14 @@ def draw_2Dmol(path):
 
 
 if __name__ == '__main__':
-    path = './dftb_gdb9_electronic_excitation_spectrum'
+    path = './dftb_aisd_electronic_excitation_spectrum'
     min_energy, max_energy, min_wavelength, max_wavelength = find_energy_and_wavelength_extremes(path, min_energy,
                                                                                                  max_energy)
     min_energy = comm.allreduce(min_energy, op=MPI.MIN)
     max_energy = comm.allreduce(max_energy, op=MPI.MAX)
     min_wavelength = comm.allreduce(min_wavelength, op=MPI.MIN)
     max_wavelength = comm.allreduce(max_wavelength, op=MPI.MAX)
-    draw_2Dmols(path)
+    #draw_2Dmols(path)
     smooth_spectra(path, min_energy, max_energy, min_wavelength, max_wavelength)
 
     print("Rank ", comm_rank, " done.", flush=True)
